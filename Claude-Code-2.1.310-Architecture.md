@@ -23,9 +23,9 @@
 
 | 项目 | 本次实际结果 |
 |---|---|
-| 命令入口 | `/Users/huangzhuangjia/.local/bin/claude` |
+| 命令入口 | `$HOME/.local/bin/claude` |
 | 入口类型 | 指向版本文件的符号链接 |
-| 实际文件 | `/Users/huangzhuangjia/.local/share/claude/versions/2.1.310` |
+| 实际文件 | `$HOME/.local/share/claude/versions/2.1.310` |
 | CLI 自报版本 | `2.1.310 (Claude Code)` |
 | 文件大小 | 274,068,224 bytes，约 261.37 MiB |
 | SHA-256 | `ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd` |

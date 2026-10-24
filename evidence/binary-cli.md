@@ -10,8 +10,8 @@
 - E-CLI-03 `/tmp/claude-cli-extra-help.txt`：MCP serve/add、插件 marketplace/install、auth login、respawn/import 帮助。
 - `/tmp/claude-macho.json` 为父调查的 REA Mach-O 结果，本文未依赖其内部结果。
 
-实际目标：`/Users/huangzhuangjia/.local/share/claude/versions/2.1.310`。
-入口 `/Users/huangzhuangjia/.local/bin/claude` 是指向上述版本路径的 symlink。文件大小 274,068,224 字节（约 261.37 MiB）；SHA-256 `ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd`。执行此文件 `--version` 输出 `2.1.310 (Claude Code)`。
+实际目标：`$HOME/.local/share/claude/versions/2.1.310`。
+入口 `$HOME/.local/bin/claude` 是指向上述版本路径的 symlink。文件大小 274,068,224 字节（约 261.37 MiB）；SHA-256 `ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd`。执行此文件 `--version` 输出 `2.1.310 (Claude Code)`。
 
 **事实**：这里的当前入口采用 native build + 版本化本地目录的布局。**推断**：入口与版本文件分离能支持切换版本和保留旧版本；没有执行 updater，也没有证明其切换操作是否原子、保留多少版本。不能因此断言此机器没有其他 npm 安装。
 
@@ -126,13 +126,13 @@ E-CLI-01 151–160 行：permission modes 为 acceptEdits/auto/bypassPermissions
 ## 8. 实际执行过的命令
 
 ```sh
-ls -l /Users/huangzhuangjia/.local/share/claude/versions/2.1.310 /Users/huangzhuangjia/.local/bin/claude /tmp/claude-help.txt /tmp/claude-macho.json
-file /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign -dv --verbose=4 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign --verify --strict --verbose=2 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign -d --entitlements :- /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-otool -L /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-otool -l /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+ls -l $HOME/.local/share/claude/versions/2.1.310 $HOME/.local/bin/claude /tmp/claude-help.txt /tmp/claude-macho.json
+file $HOME/.local/share/claude/versions/2.1.310
+codesign -dv --verbose=4 $HOME/.local/share/claude/versions/2.1.310
+codesign --verify --strict --verbose=2 $HOME/.local/share/claude/versions/2.1.310
+codesign -d --entitlements :- $HOME/.local/share/claude/versions/2.1.310
+otool -L $HOME/.local/share/claude/versions/2.1.310
+otool -l $HOME/.local/share/claude/versions/2.1.310
 ```
 
 Python `hashlib.sha256(Path(target).read_bytes()).hexdigest()` 与 `Path.stat()` 取得身份和大小。

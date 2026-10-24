@@ -1,14 +1,14 @@
 sha256 ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd
 size 274068224
 
-$ file /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ file $HOME/.local/share/claude/versions/2.1.310
 exit=0
-/Users/huangzhuangjia/.local/share/claude/versions/2.1.310: Mach-O 64-bit executable arm64
+$HOME/.local/share/claude/versions/2.1.310: Mach-O 64-bit executable arm64
 
 
-$ codesign -dv --verbose=4 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ codesign -dv --verbose=4 $HOME/.local/share/claude/versions/2.1.310
 exit=0
-Executable=/Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+Executable=$HOME/.local/share/claude/versions/2.1.310
 Identifier=com.anthropic.claude-code
 Format=Mach-O thin (arm64)
 CodeDirectory v=20500 size=534597 flags=0x10000(runtime) hashes=16695+7 location=embedded
@@ -38,31 +38,31 @@ Sealed Resources=none
 Internal requirements count=1 size=188
 
 
-$ codesign --verify --strict --verbose=2 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ codesign --verify --strict --verbose=2 $HOME/.local/share/claude/versions/2.1.310
 exit=0
-/Users/huangzhuangjia/.local/share/claude/versions/2.1.310: valid on disk
-/Users/huangzhuangjia/.local/share/claude/versions/2.1.310: satisfies its Designated Requirement
+$HOME/.local/share/claude/versions/2.1.310: valid on disk
+$HOME/.local/share/claude/versions/2.1.310: satisfies its Designated Requirement
 
 
-$ codesign -d --entitlements :- /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ codesign -d --entitlements :- $HOME/.local/share/claude/versions/2.1.310
 exit=0
 <?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>com.apple.security.automation.apple-events</key><true/><key>com.apple.security.cs.allow-jit</key><true/><key>com.apple.security.cs.allow-unsigned-executable-memory</key><true/><key>com.apple.security.cs.disable-library-validation</key><true/><key>com.apple.security.device.audio-input</key><true/></dict></plist>
-Executable=/Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+Executable=$HOME/.local/share/claude/versions/2.1.310
 warning: Specifying ':' in the path is deprecated and will not work in a future release
 
 
-$ otool -L /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ otool -L $HOME/.local/share/claude/versions/2.1.310
 exit=0
-/Users/huangzhuangjia/.local/share/claude/versions/2.1.310:
+$HOME/.local/share/claude/versions/2.1.310:
 	/usr/lib/libicucore.A.dylib (compatibility version 1.0.0, current version 78.1.0)
 	/usr/lib/libresolv.9.dylib (compatibility version 1.0.0, current version 1.0.0)
 	/usr/lib/libc++.1.dylib (compatibility version 1.0.0, current version 2100.43.0)
 	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1356.0.0)
 
 
-$ otool -l /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+$ otool -l $HOME/.local/share/claude/versions/2.1.310
 exit=0
-/Users/huangzhuangjia/.local/share/claude/versions/2.1.310:
+$HOME/.local/share/claude/versions/2.1.310:
 Load command 0
       cmd LC_SEGMENT_64
   cmdsize 72

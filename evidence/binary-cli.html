@@ -8,8 +8,8 @@
 <li>E-CLI-03 <code>/tmp/claude-cli-extra-help.txt</code>：MCP serve/add、插件 marketplace/install、auth login、respawn/import 帮助。</li>
 <li><code>/tmp/claude-macho.json</code> 为父调查的 REA Mach-O 结果，本文未依赖其内部结果。</li>
 </ul>
-<p>实际目标：<code>/Users/huangzhuangjia/.local/share/claude/versions/2.1.310</code>。
-入口 <code>/Users/huangzhuangjia/.local/bin/claude</code> 是指向上述版本路径的 symlink。文件大小 274,068,224 字节（约 261.37 MiB）；SHA-256 <code>ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd</code>。执行此文件 <code>--version</code> 输出 <code>2.1.310 (Claude Code)</code>。</p>
+<p>实际目标：<code>$HOME/.local/share/claude/versions/2.1.310</code>。
+入口 <code>$HOME/.local/bin/claude</code> 是指向上述版本路径的 symlink。文件大小 274,068,224 字节（约 261.37 MiB）；SHA-256 <code>ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd</code>。执行此文件 <code>--version</code> 输出 <code>2.1.310 (Claude Code)</code>。</p>
 <p><strong>事实</strong>：这里的当前入口采用 native build + 版本化本地目录的布局。<strong>推断</strong>：入口与版本文件分离能支持切换版本和保留旧版本；没有执行 updater，也没有证明其切换操作是否原子、保留多少版本。不能因此断言此机器没有其他 npm 安装。</p>
 <h2 id="2">2. 原生载体与嵌入运行时</h2>
 <p>E-NATIVE-01 第 4–7 行：<code>file</code> 为 <code>Mach-O 64-bit executable arm64</code>，为 thin arm64 架构，非 universal fat binary。</p>
@@ -157,13 +157,13 @@
 <h2 id="7">7. 安装与更新层</h2>
 <p><code>claude install [target]</code> 明确支持 stable/latest/固定版本 native build，--force。<code>update|upgrade</code> 检查更新并安装，package-manager 安装由 package manager 更新（E-CLI-02 第 171–189 行）。本机 symlink/version 文件布局与 native build 相符。未执行以上动作，因此下载源、版本清单、签名验证时机、差分下载、回滚策略及自动更新调度未知。</p>
 <h2 id="8">8. 实际执行过的命令</h2>
-<pre><code class="language-sh">ls -l /Users/huangzhuangjia/.local/share/claude/versions/2.1.310 /Users/huangzhuangjia/.local/bin/claude /tmp/claude-help.txt /tmp/claude-macho.json
-file /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign -dv --verbose=4 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign --verify --strict --verbose=2 /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-codesign -d --entitlements :- /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-otool -L /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
-otool -l /Users/huangzhuangjia/.local/share/claude/versions/2.1.310
+<pre><code class="language-sh">ls -l $HOME/.local/share/claude/versions/2.1.310 $HOME/.local/bin/claude /tmp/claude-help.txt /tmp/claude-macho.json
+file $HOME/.local/share/claude/versions/2.1.310
+codesign -dv --verbose=4 $HOME/.local/share/claude/versions/2.1.310
+codesign --verify --strict --verbose=2 $HOME/.local/share/claude/versions/2.1.310
+codesign -d --entitlements :- $HOME/.local/share/claude/versions/2.1.310
+otool -L $HOME/.local/share/claude/versions/2.1.310
+otool -l $HOME/.local/share/claude/versions/2.1.310
 </code></pre>
 <p>Python <code>hashlib.sha256(Path(target).read_bytes()).hexdigest()</code> 与 <code>Path.stat()</code> 取得身份和大小。</p>
 <p>以下均调用目标绝对路径，不依赖 PATH 的其他版本：</p>
