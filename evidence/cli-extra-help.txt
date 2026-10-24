@@ -1,0 +1,141 @@
+$ claude mcp serve --help
+Usage: claude mcp serve [options]
+
+Start the Claude Code MCP server
+
+Options:
+  -d, --debug  Enable debug mode
+  -h, --help   Display help for command
+  --verbose    Override verbose mode setting from config
+
+
+$ claude mcp add --help
+Usage: claude mcp add [options] <name> <commandOrUrl> [args...]
+
+Add an MCP server to Claude Code.
+
+Examples:
+  # Add HTTP server:
+  claude mcp add --transport http sentry https://mcp.sentry.dev/mcp
+
+  # Add HTTP server with headers:
+  claude mcp add --transport http corridor https://app.corridor.dev/api/mcp
+--header "Authorization: Bearer ..."
+
+  # Add stdio server with environment variables:
+  claude mcp add my-server -e API_KEY=xxx -- npx my-mcp-server
+
+  # Add stdio server with subprocess flags:
+  claude mcp add my-server -- my-command --some-flag arg1
+
+Options:
+  --callback-port <port>       Fixed port for OAuth callback (for servers
+                               requiring pre-registered redirect URIs)
+  --client-id <clientId>       OAuth client ID for HTTP/SSE servers
+  --client-secret              Prompt for OAuth client secret (or set
+                               MCP_CLIENT_SECRET env var)
+  -e, --env <env...>           Set environment variables (e.g. -e KEY=value)
+  -H, --header <header...>     Set headers for HTTP/SSE servers (e.g. -H
+                               "X-Api-Key: abc123" -H "X-Custom: value")
+  -h, --help                   Display help for command
+  -s, --scope <scope>          Configuration scope (local, user, or project)
+                               (default: "local")
+  -t, --transport <transport>  Transport type (stdio, sse, http). Defaults to
+                               stdio if not specified.
+
+
+$ claude plugin marketplace --help
+Usage: claude plugin marketplace [options] [command]
+
+Manage Claude Code marketplaces
+
+Options:
+  -h, --help                  Display help for command
+
+Commands:
+  add [options] <source>      Add a marketplace from a URL, path, or GitHub repo
+  help [command]              display help for command
+  list [options]              List all configured marketplaces
+  remove|rm [options] <name>  Remove a configured marketplace
+  update [options] [name]     Update marketplace(s) from their source - updates
+                              all if no name specified
+
+
+$ claude plugin install --help
+Usage: claude plugin install|i [options] <plugin>
+
+Install a plugin from available marketplaces (use plugin@marketplace for
+specific marketplace)
+
+Options:
+  --accept-command <sha256>  Accept the marketplace-declared command (a
+                             command-source install, or the headersHelper that
+                             fetches the archive) whose sha256 a previous --json
+                             run reported as shownCommand.sha256; counts as -y
+                             for exactly that command, for that plugin and
+                             marketplace catalog, and nothing else. If either
+                             changed (a refresh that moved the catalog counts),
+                             the run refuses and reports the command again, to
+                             be shown to a person again
+  --config <key=value>       Set a userConfig option declared in the plugin's
+                             manifest, or a bundled .mcpb server's own
+                             user_config field as <server>.<key>=<value> (a bare
+                             key works when only one bundled server declares
+                             it). Repeatable. Values are validated against the
+                             schema and stored via the same path as the
+                             interactive /plugin configure flow.
+  -h, --help                 Display help for command
+  --json                     Print one machine-readable result line on stdout
+                             instead of the human message (same exit codes; a
+                             marketplace-declared command is still shown and
+                             must be confirmed — pass -y when not interactive)
+  --marketplace <source>     Install <plugin> (its bare name) from the
+                             marketplace at this source: owner/repo, a git or
+                             https URL, or a path. A marketplace not added yet
+                             is added first, in user settings, under the same
+                             checks as 'plugin marketplace add'
+  --registry <url>           For a <package>@npm install: resolve and download
+                             from this npm registry instead of the one your npm
+                             configuration selects
+  -s, --scope <scope>        Installation scope: user, project, or local
+                             (default: "user")
+  -y, --yes                  Accept the displayed marketplace-declared command
+                             without the confirmation prompt — a plugin
+                             installed by running a command, or one whose
+                             archive is fetched through a headersHelper command
+                             (required when stdin or stdout is not a TTY)
+
+
+$ claude auth login --help
+Usage: claude auth login [options]
+
+Sign in to your Anthropic account
+
+Options:
+  --claudeai       Use Claude subscription (default)
+  --console        Use Anthropic Console (API usage billing) instead of Claude
+                   subscription
+  --email <email>  Pre-populate email address on the login page
+  -h, --help       Display help for command
+  --sso            Force SSO login flow
+
+
+$ claude respawn --help
+Usage: claude respawn <id>|--all
+
+  Restart a background session (or all of them) so it picks up the current Claude binary.
+
+
+$ claude import --help
+Usage: claude import [options] [source]
+
+Import config from another AI coding agent into Claude Code
+
+Arguments:
+  source      Which agent to import from (codex, gemini, cursor)
+
+Options:
+  --dry-run   Show what would be imported without writing anything
+  -h, --help  Display help for command
+  --yes       Skip the interactive picker. On headless surfaces, pass
+              --yes=<digest> from the `/import` preview.

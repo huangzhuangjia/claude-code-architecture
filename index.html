@@ -1,0 +1,598 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Claude Code 2.1.310 本机架构分析</title><style>*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:#f7f6f2;color:#222b31;font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}header{background:#192e35;color:#f5f1e8;padding:42px 6vw 30px;border-bottom:5px solid #bb7359}header span{color:#c7d4ce;font-size:12px;letter-spacing:.12em}header h1{font-size:31px;margin:8px 0}header p{margin:0;color:#c9d6d8}.shell{max-width:1480px;margin:auto;display:grid;grid-template-columns:260px minmax(0,1fr);gap:42px;padding:35px 4vw}aside{position:sticky;top:20px;align-self:start;max-height:94vh;overflow:auto;font-size:13px;border-right:1px solid #d6dad6;padding-right:18px}aside a{display:block;text-decoration:none;color:#48595f;padding:4px 0}aside a:hover,a{color:#986047}aside ol{padding-left:18px}article{min-width:0;max-width:1050px}h1{font-size:29px;line-height:1.4}h2{font-size:24px;margin-top:52px;border-top:1px solid #d6dad6;padding-top:24px;scroll-margin-top:20px}h3{font-size:19px;margin-top:26px}p{margin:13px 0}blockquote{margin:22px 0;padding:15px 20px;border-left:4px solid #bb7359;background:#efede6;font-size:14px}table{width:100%;border-collapse:collapse;display:block;overflow:auto;font-size:14px;margin:22px 0}th{background:#e5e9e5;text-align:left}th,td{padding:10px 14px;border:1px solid #d6dad6;vertical-align:top}code{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;background:#eaece7;padding:2px 4px;border-radius:3px}pre{padding:20px;background:#213238;color:#e4ede4;border-radius:7px;overflow:auto;line-height:1.65;white-space:pre-wrap;overflow-wrap:anywhere}pre code{background:none;color:inherit;padding:0}li{margin:6px 0}a{text-underline-offset:3px}footer{max-width:1100px;margin:30px auto;padding:30px;color:#6b7779;font-size:13px}.intro{font-size:12px;color:#4c625f;background:#e5ede7;padding:10px 16px;margin-bottom:20px}@media(max-width:950px){.shell{display:block;padding:22px}aside{position:static;max-height:270px;border:1px solid #d6dad6;padding:15px;margin-bottom:25px}header h1{font-size:25px}h2{font-size:21px}}@media print{aside,header,footer{display:none}.shell{display:block;padding:0}body{background:white;font-size:10pt}article{max-width:none}pre{background:#f1f3f2;color:#222;break-inside:avoid}h2{break-after:avoid}a{color:inherit}table{font-size:9pt}}</style></head><body><header><span>LOCAL ARTIFACT ARCHITECTURE / 2026-10-24</span><h1>Claude Code 2.1.310 本机架构分析</h1><p>Claude Code 2.1.310 · ARM64 · 证据驱动的客户端架构重建</p></header><div class="shell"><aside><a href="#claude-code-21310">Claude Code 2.1.310 本机架构分析</a><a href="#1">1. 核心结论</a><a href="#2">2. 对象身份与可重复性</a><a href="#3">3. 总体架构</a><a href="#4">4. 分发、启动与运行时</a><a href="#5">5. 输入输出与界面层</a><a href="#6-agent">6. Agent 主循环：从请求到工具反馈</a><a href="#7">7. 模型、请求与供应商适配</a><a href="#8">8. 工具系统：合同、调度与执行</a><a href="#9">9. 权限与沙箱</a><a href="#10">10. 上下文、提示快照与压缩</a><a href="#11">11. 会话持久化、恢复与成本状态</a><a href="#12-subagent">12. Subagent、后台任务与协作</a><a href="#13-mcp">13. MCP：外部工具客户端与内部工具服务器</a><a href="#14-pluginskillhookslsp-ide">14. Plugin、Skill、Hooks、LSP 与 IDE</a><a href="#15">15. 配置、认证与可观测性</a><a href="#16">16. 两条关键业务链路</a><a href="#17">17. 架构评估与可借鉴之处</a><a href="#18">18. 完成度、限制与证据导航</a></aside><article><div class="intro">静态事实 · CLI 契约 · 架构推断 ｜ 无外部脚本、字体或网络资源</div><h1 id="claude-code-21310">Claude Code 2.1.310 本机架构分析</h1>
+<blockquote>
+<p>调查日期：2026-10-24（Asia/Shanghai）<br />
+分析对象：本机实际执行的 Claude Code 发布件。<br />
+方法：REA 静态分析、Mach-O/签名检查、发行件 JavaScript 提取与语法解析、CLI 帮助检查。<br />
+结论范围：客户端实现；不涵盖 Anthropic 服务端内部架构。</p>
+</blockquote>
+<h2 id="1">1. 核心结论</h2>
+<p>本机 Claude Code 是一个将 <strong>Bun / JavaScriptCore 运行环境、JavaScript 业务模块和资源打包到 ARM64 Mach-O 中的代理应用</strong>。它的架构重点是管理一个持续、多轮、有状态的工具调用过程：接收请求，准备上下文，调用模型，处理流式响应，执行工具，回填结果，再决定继续或结束。</p>
+<p>围绕这一核心，它还实现了终端界面、机器可读的 headless 接口、后台会话、权限决策、操作系统级命令沙箱、会话持久化、MCP、插件与生命周期 Hooks。CLI 是这些子系统的入口集合；不能把 CLI 帮助中列出的每种能力都视为本机已经启用的服务。</p>
+<p>最值得关注的五个设计点：</p>
+<ol>
+<li><strong>分发载体与业务实现分开理解。</strong> 虽然安装物是原生可执行文件，内部依然可以观察到大量 JavaScript 模块与 JS 引擎结构。</li>
+<li><strong>模型与本地执行器分开。</strong> 本地程序负责上下文、策略、执行与状态管理，模型调用是其中一个外部边界。</li>
+<li><strong>显示与执行分开。</strong> React/Yoga 终端界面和 stream-json/headless 接口都围绕代理执行过程组织，但其适配、事件转发与交互方式不同。</li>
+<li><strong>权限与沙箱是不同层。</strong> 工具权限回答“是否允许这个动作”，沙箱限制特定子进程对文件系统和网络的访问。二者不能互相替代。</li>
+<li><strong>会话是可恢复的结构化状态。</strong> 发行代码中既有 JSONL 转录处理，也有带 namespace/key 的 storageV5 接口；恢复不只是重新读取一份可见聊天文本。</li>
+</ol>
+<h2 id="2">2. 对象身份与可重复性</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>本次实际结果</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>命令入口</td>
+<td><code>/Users/huangzhuangjia/.local/bin/claude</code></td>
+</tr>
+<tr>
+<td>入口类型</td>
+<td>指向版本文件的符号链接</td>
+</tr>
+<tr>
+<td>实际文件</td>
+<td><code>/Users/huangzhuangjia/.local/share/claude/versions/2.1.310</code></td>
+</tr>
+<tr>
+<td>CLI 自报版本</td>
+<td><code>2.1.310 (Claude Code)</code></td>
+</tr>
+<tr>
+<td>文件大小</td>
+<td>274,068,224 bytes，约 261.37 MiB</td>
+</tr>
+<tr>
+<td>SHA-256</td>
+<td><code>ffb64331bc0ee1b69efb7c2c428bd3ab516bc31b75bf60886b356c97c1c25ffd</code></td>
+</tr>
+<tr>
+<td>格式</td>
+<td>thin Mach-O，64-bit，arm64</td>
+</tr>
+<tr>
+<td>最低系统 / 构建 SDK</td>
+<td>macOS 13.0 / SDK 26.5</td>
+</tr>
+<tr>
+<td>签名主体</td>
+<td>Developer ID Application: Anthropic PBC</td>
+</tr>
+<tr>
+<td>Team ID</td>
+<td><code>Q6L2SF6YDW</code></td>
+</tr>
+<tr>
+<td>Bundle identifier</td>
+<td><code>com.anthropic.claude-code</code></td>
+</tr>
+</tbody>
+</table>
+<p>以上是这个确切哈希对应版本的分析，不代表其他安装渠道、历史版本、Windows 或 Linux 发布件与它完全相同。<a href="evidence/native.txt">NATIVE</a>、<a href="evidence/macho.json">REA Mach-O</a></p>
+<h3 id="21">2.1 证据等级</h3>
+<p>全文采用三种表述：</p>
+<ul>
+<li><strong>静态事实</strong>：文件元数据、语法结构、函数体、参数校验、数据读写代码中直接可见。</li>
+<li><strong>CLI 契约</strong>：目标程序自己输出的 <code>--help</code> / <code>--version</code> 描述；证明入口和声明行为，未证明成功运行。</li>
+<li><strong>架构推断</strong>：从上述事实归纳出来的层次、职责或设计动机；不冒充原作者的内部设计文档。</li>
+</ul>
+<p>调查没有发起模型推理、启动云会话、连接 MCP 服务器、运行插件、执行工具任务或更改安装；没有读取用户的凭证值、设置值和历史会话内容。目标程序只执行了版本和帮助命令。这里分析的是安装软件的能力与代码，不是账户当前配置。</p>
+<h3 id="22-javascript">2.2 JavaScript 提取边界</h3>
+<p>扫描发行二进制中的 <code>// @bun @bytecode</code> 文本标记，取得以 NUL 结尾的 UTF-8 文本候选，并保留原文件字节范围与 SHA-256。共发现 2,569 个候选，其中 <code>module-000.js</code> 是 Bun 运行时内部的标记模板，不能解析，已经排除；<strong>其余 2,568 个候选通过 JavaScript 语法解析</strong>。所有候选共约 49.6 MB，包含应用代码和打包依赖。</p>
+<p><code>module-499.js</code> 等名称是本次分析生成的编号，并非开发仓库的真实文件名。保留的 <code>/$bunfs/root/chunk-*.js</code> 导入路径是构建产物路径，不是可直接访问的开发源码路径。本次没有完整解码 Bun 的虚拟文件系统索引，也没有恢复 TypeScript 类型、原始模块目录或完整 sourcemap。因此，本文给出的是<strong>功能架构重建</strong>，不是声称恢复了原始源码工程。</p>
+<p>REA 对 9 个选定模块执行了局部语法/语义分析，读入 311,938 bytes，访问 73,198 个 AST 节点，9 个文件均解析成功。关系图为 <strong>partial</strong>；1,000 条保留的 semantic unknown 达到此次容量上限。其摘要不能作为“全部代码已分析”的证明。另用惰性 AST 遍历检查其余文本，未执行这些 JavaScript。<a href="evidence/rea-evidence.json">REA 证据</a>、<a href="evidence/extraction-manifest.json">提取清单</a></p>
+<h2 id="3">3. 总体架构</h2>
+<p>下面是依据职责归纳的架构视图；框中的功能在发行代码或 CLI 中有证据，连线表示概念数据流，不代表逐条恢复的原生调用图。</p>
+<pre><code class="language-text">使用者 / SDK 宿主 / 后台管理命令
+                │
+     ┌──────────┴────────────┐
+     │ CLI 启动与配置、模式选择 │
+     └──────────┬────────────┘
+                │
+   ┌────────────┼────────────────┐
+   │            │                │
+交互式 TUI   Headless / SDK    后台会话与云/远程入口
+React/Yoga   text/json/JSONL    部分为可选集成
+   │            │                │
+   └────────────┼────────────────┘
+                ▼
+     ┌──────────────────────────────┐
+     │  Agent 编排核心               │
+     │  messages / prompt / context │
+     │  streaming / tool loop       │
+     │  compact / retry / stop      │
+     └──────┬────────────────┬──────┘
+            │                │
+        模型适配层       工具调用调度层
+            │                │
+      外部推理提供方    schema / permissions / hooks
+                             │
+                   ┌─────────┼──────────┐
+                   │         │          │
+                本地工具   MCP 工具    扩展/子任务
+                   │
+           进程 / FS / 网络与可选沙箱
+
+横向支撑：配置与策略 │ 认证 │ storageV5 / transcript
+          插件与技能 │ IDE/LSP │ 遥测与成本记录
+底层载体：Bun + JavaScriptCore + macOS 系统 API
+</code></pre>
+<p>模型服务端的训练、调度、模型权重、推理集群、租户隔离均不在本地文件可证明的范围内。</p>
+<h2 id="4">4. 分发、启动与运行时</h2>
+<h3 id="41">4.1 单文件不等于纯原生业务实现</h3>
+<p>Mach-O 中存在 <code>__BUN/__bun</code>、<code>__bun_builtins</code>、<code>__jsc_int</code>、<code>__jsc_opcodes</code>。<code>__BUN</code> 段从文件 offset 93,241,344 开始；其 <code>__bun</code> 节约 180 MB。提取文本还能看到 <code>/$bunfs/root/</code> 虚拟路径、ESM imports 和压缩后的函数定义。两类证据共同支持“嵌入运行时 + 打包 JS”的判断。</p>
+<p>动态依赖表列出了 <code>libicucore.A.dylib</code>、<code>libresolv.9.dylib</code>、<code>libc++.1.dylib</code> 和 <code>libSystem.B.dylib</code>。未列外置 Node 或 Bun dylib，符合运行时随 executable 交付的模式；运行时可能使用 <code>dlopen</code>，所以不能把这份表当作所有动态依赖的完整清单。</p>
+<h3 id="42">4.2 启动入口与工作目录</h3>
+<p><code>module-001.js</code> 的 <code>bis()</code> 读取 cwd，尝试 <code>realpathSync</code> 并做 NFC 归一化，失败则保留归一化路径；<code>tRt()</code> 根据后台会话环境标记决定是否返回初始 cwd。说明启动目录不仅用于显示，还参与会话及宿主环境的组织。<a href="evidence/source-anchors.html#s01">S01</a></p>
+<p><code>module-848.js</code> 中可见选项读取、CLI 来源识别、MCP 设置迁移、模式分支、认证检查、遥测初始化和启动 Hook 的调度。它是启动协调层之一，不能据单个模块就断言它是唯一入口。<a href="evidence/source-anchors.html#s02">S02</a></p>
+<h3 id="43">4.3 安装与更新</h3>
+<p>实际布局是 <code>bin/claude → share/claude/versions/&lt;version&gt;</code>；CLI 支持 <code>install [stable|latest|version]</code> 和 <code>update|upgrade</code>。从架构上看，入口和具体版本分开，便于版本替换；本次没有执行 updater，不确定替换是否原子、旧版本保留策略和回滚机制。<code>respawn</code> 命令的帮助明确表示可重启后台会话，使其运行当前版本的 binary。<a href="evidence/cli-subcommands.txt">CLI 子命令</a></p>
+<h2 id="5">5. 输入输出与界面层</h2>
+<h3 id="51-ui">5.1 交互式终端 UI</h3>
+<p>发行代码中存在 React element/context/hooks 实现。<code>module-489.js</code> 可见 <code>react.transitional.element</code>、<code>useState</code>、<code>useSyncExternalStore</code> 等结构；<code>module-579.js</code> 包含 <code>R5e</code> 终端渲染器类、<code>ink-*</code> 节点、Yoga 布局调用、屏幕/光标/选区状态与帧调度。</p>
+<p><code>R5e.calculateYogaLayout()</code> 根据终端 columns 设置布局宽度；非 TTY 时采用自动宽度，并在超过上限时重新布局。<code>runLayoutPass()</code> 捕获布局异常，调用 <code>relayoutFromScratch()</code> 清理布局缓存后重试，并记录恢复或持续失败状态。这表明界面层不只是 <code>console.log</code>，而是带布局、差异绘制及终端状态管理的组件渲染系统。<a href="evidence/source-anchors.html#s03">S03</a>、<a href="evidence/source-anchors.html#s04">S04</a></p>
+<p>可以称其为 <strong>React / Ink 风格的终端渲染架构</strong>。存在 <code>ink</code> 节点或日志并不能证明它使用未修改的某个公开 Ink 版本；本文不指定未经验证的 UI 库精确版本。</p>
+<h3 id="52-headless">5.2 Headless 与机器协议</h3>
+<p>CLI 支持 <code>-p/--print</code>，输入 <code>text</code> 或 <code>stream-json</code>，输出 <code>text</code>、<code>json</code>、<code>stream-json</code>。<code>module-1920.js</code> 还显式导出 <code>runHeadless</code>、<code>loadInitialMessages</code>、<code>mergeMcpClientLists</code>、<code>ownCostLedger</code> 和启动 SDK 事件转发相关函数名。这为“独立 headless 适配层”提供了比帮助文本更直接的代码证据。<a href="evidence/source-anchors.html#s05">S05</a></p>
+<p>可选接口包括增量消息、用户消息重放、Hook 事件、子 Agent 的 <code>parent_tool_use_id</code>。架构上，这使外部宿主可以在不实现终端 UI 的情况下驱动会话并消费事件。但本次没有启动 SDK 会话，未验证全部事件 schema、错误编码、背压和重连语义。</p>
+<h3 id="53-desktopide">5.3 云、Desktop、IDE 与浏览器入口</h3>
+<p>帮助项声明 <code>--cloud</code>、<code>--environment</code>、<code>--desktop</code>、<code>--ide</code>、<code>--chrome</code> 和远程控制能力。<code>module-848.js</code> 的 cloud 分支会检查 session id、认证/许可状态、会话归档状态及输出格式；例如该分支明确拒绝某些 <code>stream-json</code> 组合。因而这些入口不是简单共享所有本地选项的等价通道。</p>
+<p>本次未连接这些集成，不推测其完整后端部署与账户可用性。</p>
+<h2 id="6-agent">6. Agent 主循环：从请求到工具反馈</h2>
+<h3 id="61">6.1 真实执行骨架</h3>
+<p><code>module-745.js</code> 的 <code>yN()</code> 是可见的 turn 包装器，<code>ku()</code> 维护查询状态，内部 <code>Cu()</code> 执行一轮。状态包括 <code>guards</code>、<code>messages</code>、<code>toolUseContext</code>、<code>compactTracking</code> 和 <code>transition</code>。外层用 <code>while</code> 继续执行，<code>next_round</code> 表示再来一轮，其他返回值结束流程。<a href="evidence/agent-loop.html">A1–A3</a></p>
+<p>虽然代码日志里出现 <code>query_recursive_call</code>，这里可见的实现是异步生成器加显式状态机，不能仅凭日志名字把它描述成不断增加 JS 调用栈的递归函数。</p>
+<p>默认依赖对象 <code>Dd()</code> 包含：</p>
+<pre><code class="language-text">callModel   → YNt
+ autocompact → SMr
+uuid        → UUID 生成器
+now         → 当前时间生成器
+</code></pre>
+<p>这种可注入依赖边界使查询引擎不必直接承担每个模型 SDK、时钟和压缩实现的细节。关于可测试性的解释属于架构推断；本次没有运行其内部测试。<a href="evidence/agent-loop.html">A3</a></p>
+<h3 id="62">6.2 一轮会做什么</h3>
+<ol>
+<li>从最近的 compact boundary 取得当前有效历史，接收新到达的消息或状态。</li>
+<li>更新模型选择、model facts、有效窗口与上下文预算。</li>
+<li>必要时自动压缩，准备 system prompt、messages、工具描述及请求选项。</li>
+<li>通过 <code>callModel</code> 发出请求，消费异步响应流。</li>
+<li>遇到 <code>tool_use</code> 时提交到流式工具执行器，输出执行过程事件。</li>
+<li>收集工具结果与更新后的上下文；检查取消、延迟工具、Hook 阻断和轮次限制。</li>
+<li>将 assistant 消息与工具结果追加到下一轮历史，或执行 stop hooks 后结束。</li>
+</ol>
+<p>这是一条从实际函数体整理出来的路径，不是根据“Agent 一般如何工作”套出的模板。工具可以在响应流处理期间入队，说明“模型输出流”和“工具执行流”在部分路径上能重叠；并不意味着任意工具调用都并行。<a href="evidence/agent-loop.html">A4–A7</a></p>
+<h3 id="63">6.3 失败是状态转换的一部分</h3>
+<p>核心循环区分 prompt too long、图片错误、输出 token 耗尽、无法解析的 tool_use、只输出 thinking、取消和 stop hook 等情况。部分错误触发一次或有限次上下文压缩/恢复请求，达到上限后返回明确终止状态。<a href="evidence/agent-loop.html">A8</a></p>
+<p>因此，“失败后重试”不是一个统一重发按钮：不同故障会改变上下文、重试标记、提示或结束原因。本次只证明这些恢复分支存在，不验证其所有运行组合和重试成功率。</p>
+<h2 id="7">7. 模型、请求与供应商适配</h2>
+<h3 id="71-model-facts">7.1 Model facts</h3>
+<p><code>module-499.js</code> 的 <code>_c()</code> 返回模型事实：context window、max output tokens、canonical model、settings key、长上下文状态、bytes-per-token 估算和 thinking/temperature 支持等。<code>module-745.js</code> 会取得这些数据用于请求和预算处理。<a href="evidence/agent-loop.html">M1</a></p>
+<p>含义是：代理执行逻辑围绕一个模型能力对象工作，而非仅凭用户输入的字符串决定所有行为。窗口、输出限制和 thinking 约束属于请求编排层的输入。bytes-per-token 是预算线索，不应当作服务端精确 tokenizer 的实现。</p>
+<h3 id="72">7.2 可见调用关系</h3>
+<pre><code class="language-text">query state machine
+  → 默认 callModel: YNt
+  → 请求包装 wSn / lSn
+  → provider client factory: bF
+  → 对应 SDK / endpoint
+</code></pre>
+<p><code>module-231.js</code> 的 <code>bF()</code> 具有 gateway、Bedrock、Foundry、Anthropic AWS / Google Cloud、Mantle、Vertex 和默认客户端分支，分别处理 region、headers、baseURL、fetch override 和认证解析器。这里列的是本发布件中的分支名，不能推定每个分支都是公开可用产品或本机当前使用的路径。<a href="evidence/agent-loop.html">M2–M4</a></p>
+<p>还观察到 <code>beta.messages.create(..., {signal, timeout})</code> 的非流式分支，以及核心查询的流式消费路径。本文不声称已穷尽全部 transport dispatch 或模型 fallback 组合。</p>
+<p><strong>架构推断</strong>：对 Agent 核心而言，模型服务通过共同的消息、工具和流事件契约接入；不同提供方的地址、认证与 SDK 差异收敛在适配层。工具本身无需分别实现每种云模型协议。<a href="evidence/agent-loop.html">M5</a></p>
+<h2 id="8">8. 工具系统：合同、调度与执行</h2>
+<h3 id="81-tool">8.1 Tool 合同</h3>
+<p>可见工具对象具有以下字段或方法，部分为可选：</p>
+<table>
+<thead>
+<tr>
+<th>合同部分</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> / aliases / description / prompt</td>
+<td>标识、用户或模型可见说明</td>
+</tr>
+<tr>
+<td><code>inputSchema</code> / <code>inputJSONSchema</code></td>
+<td>输入结构合同</td>
+</tr>
+<tr>
+<td><code>outputSchema</code></td>
+<td>某些结果的结构验证</td>
+</tr>
+<tr>
+<td><code>isEnabled</code></td>
+<td>是否进入本次可用集合</td>
+</tr>
+<tr>
+<td><code>isReadOnly</code> / <code>isConcurrencySafe</code></td>
+<td>操作属性与调度提示</td>
+</tr>
+<tr>
+<td><code>validateInput</code></td>
+<td>工具特定的语义校验</td>
+</tr>
+<tr>
+<td><code>checkPermissions</code></td>
+<td>工具自己的权限决策参与点</td>
+</tr>
+<tr>
+<td><code>call</code></td>
+<td>实际执行</td>
+</tr>
+<tr>
+<td><code>mapToolResultToToolResultBlockParam</code></td>
+<td>转换为模型协议中的工具结果</td>
+</tr>
+</tbody>
+</table>
+<p>内置工具和 MCP 适配工具都可参与这套合同。不要将可选方法描述成每个工具必须具备的固定接口。<a href="evidence/tools-extensions.html">TE-01、TE-07、TE-14</a></p>
+<h3 id="82">8.2 并发执行器</h3>
+<p><code>module-745.js</code> 的 <code>Ls</code> 维护 <code>queued → executing → completed → yielded</code> 状态。调用入队前，用 schema 解析成功的数据判断 <code>isConcurrencySafe</code>；不确定或判断抛错时按不安全处理。已有工具执行时，只有新工具和所有在执行工具均允许并发，才会重叠运行。不安全工具等待独占，且会阻挡后面的队列项继续调度。<a href="evidence/agent-loop.html">A6</a>、<a href="evidence/tools-extensions.html">TE-01/02</a></p>
+<p>这更接近一个带并发约束的调度器，而不是对模型生成的调用数组直接 <code>Promise.all</code>。执行器还拥有派生取消控制器、完成结果保留和中止未完成调用的逻辑。</p>
+<h3 id="83">8.3 单次调用的执行链</h3>
+<p>工具执行的可见路径可概括为：</p>
+<pre><code class="language-text">模型 tool_use
+ → 解析名称 / alias，必要时等待动态 MCP 工具
+ → JSON / schema / validateInput
+ → PreToolUse
+ → HOr / T8r / canUseTool 等权限处理
+ → behavior == allow
+ → tool.call
+ → PostToolUse
+ → 对改写输出再次验证
+ → tool_result 回到消息流
+</code></pre>
+<p><code>module-499.js</code> 的 <code>D6</code>、<code>o7r</code>、<code>f7r</code> 等函数承担上述调度与执行职责。拒绝、取消或工具不存在等情况会形成错误工具结果，保持对话协议中的调用与反馈关联。PostToolUse 若改写输出，代码还会验证改写数据，不能认为 Hook 可以任意改变结构而无检查。<a href="evidence/tools-extensions.html">TE-03–08</a></p>
+<h2 id="9">9. 权限与沙箱</h2>
+<h3 id="91">9.1 应用级权限决策</h3>
+<p>CLI 暴露 <code>manual</code>、<code>acceptEdits</code>、<code>auto</code>、<code>dontAsk</code>、<code>plan</code>、<code>bypassPermissions</code> 模式，以及 allow/deny 工具规则、额外工作目录、SDK 宿主权限回应。</p>
+<p>继续追踪 <code>HOr → T8r</code> 可见：PreToolUse 的 deny 阻断执行；Hook 的 allow 不能覆盖匹配的 deny rule；ask rule、安全检查、plan mode 或 <code>requireCanUseTool</code> 条件仍可要求中央权限决策。因而“Hook 返回 allow = 无条件执行”的说法与本次可见实现不符。<a href="evidence/tools-extensions.html">TE-26</a></p>
+<p>本次没有穷尽 managed policy、分类器、所有工具私有规则的完整组合优先级，不能把上面局部事实扩展成一份完整的权限形式化规范。</p>
+<h3 id="92">9.2 操作系统级命令沙箱</h3>
+<p><code>module-320.js</code> 的可见实现中，macOS 路径会构造 <code>sandbox-exec -p &lt;profile&gt; ... shell -c ...</code>；Linux 路径构造 <code>bwrap</code> 参数。代码还包含网络代理、文件读写路径、参数长度和 NUL 检查等处理。<a href="evidence/tools-extensions.html">TE-09/10</a></p>
+<p>这里能证明的是打包代码具有这些平台后端；<strong>未验证本机当前会话启用了哪套沙箱，也未验证所有工具、MCP server 或插件进程均处在同样的边界内</strong>。Linux 分支出现在 macOS 包里，不等于它在这台机器运行。</p>
+<h3 id="93-agent">9.3 签名安全与 Agent 权限不是一回事</h3>
+<p>本文件的签名验证通过，hardened runtime 开启，同时声明 allow-jit、allow-unsigned-executable-memory、disable-library-validation、Apple Events 和音频输入等 entitlement。它们描述操作系统允许该程序申请或使用的能力，不能证明已取得用户 TCC 授权或正在执行录音/自动化。<a href="evidence/native.txt">签名证据</a></p>
+<p>签名验证不等于工具权限审计，也不等于在线 notarization 验证；本次没有执行后者。</p>
+<h3 id="94">9.4 三种启动缩减模式</h3>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>本版本帮助的声明</th>
+<th>架构解释与边界</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--bare</code></td>
+<td>跳过 Hooks、LSP、plugin sync、auto-memory、预取、Keychain、CLAUDE.md 自动发现等；显式技能仍可解析</td>
+<td>最小启动路径，不等于无网络或无执行工具</td>
+</tr>
+<tr>
+<td><code>--safe-mode</code></td>
+<td>禁用多种用户定制；admin managed policy 仍适用，内置工具、认证和权限正常</td>
+<td>排查定制问题的隔离入口，不等于 OS 沙箱</td>
+</tr>
+<tr>
+<td><code>--restricted</code></td>
+<td>默认移除部分代码执行和抓取工具，约束设置来源和路径，拒绝 bypass</td>
+<td>受限工具运行策略，仍需分别考虑 MCP 与 OS 隔离</td>
+</tr>
+</tbody>
+</table>
+<p>以上是本地 <code>--help</code> 契约，未逐项运行验证。<a href="evidence/cli-help.txt">根帮助</a></p>
+<h2 id="10">10. 上下文、提示快照与压缩</h2>
+<h3 id="101-prompt-snapshot">10.1 Prompt snapshot</h3>
+<p>CLI 的 <code>--system-prompt-snapshot</code> 帮助明确描述：通常在首次请求记录渲染后的 system prompt，后续请求与恢复复用，直到 compact；也可选择关闭快照以每次重建。<code>module-499.js</code> 中可见 <code>prompt_snapshot</code>、<code>prompt_render_point</code>、<code>deferred_tools_record</code>、快照解析缓存及开关判断 <code>rje()</code>。<a href="evidence/source-anchors.html#s06">S06</a>、<a href="evidence/cli-help.txt">根帮助</a></p>
+<p>这说明本版本不仅保存用户和 assistant 文本，还记录某些“发送时上下文”的结构。<strong>架构推断</strong>：它有助于维持请求前缀稳定，并让恢复会话保留既有提示上下文；实际服务端缓存命中率未测量。</p>
+<h3 id="102-compact-boundary">10.2 Compact boundary 与摘要</h3>
+<p><code>module-382.js</code> 的 <code>ks()</code> 从最近 <code>compact_boundary</code> 起选择当前历史。自动压缩调度器 <code>SMr()</code> 检查模型窗口、预算、开关、预计算结果及失败状态；实际摘要函数 <code>yMr()</code> 运行 PreCompact、构造摘要模型请求、清理部分读文件/记忆状态、重建附件，生成 boundary 与 summary，再运行 PostCompact。<a href="evidence/agent-loop.html">C1–C4</a></p>
+<p>压缩后的有效消息不是只把历史替换为一段字符串，而是类似：</p>
+<pre><code class="language-text">boundary
+ + summaryMessages
+ + optional replacement
+ + messagesToKeep
+ + attachments
+ + hookResults
+</code></pre>
+<p>全量摘要路径可能不保留原消息，但不能因此断言所有压缩方式都清空原始消息。摘要需要额外模型调用，这也意味着压缩具有耗时、费用和信息选择成本；本次没有执行并测量。</p>
+<h3 id="103">10.3 保护与恢复</h3>
+<p>可见代码跟踪反复快速填满上下文的次数，并在满足条件时触发 rapid-refill breaker；预计算摘要在复用前检查相关 UUID 和历史变化。请求过长的 reactive compaction 也有尝试标记和有限恢复路径。<a href="evidence/agent-loop.html">C5/C6</a></p>
+<p>本次不提供“固定到 80% 就必然压缩”这类规则：实际行为依赖模型窗口、设置和条件分支。也没有恢复完整 recall、microcompact 或服务端 tokenizer 算法。</p>
+<h2 id="11">11. 会话持久化、恢复与成本状态</h2>
+<h3 id="111">11.1 不止可见对话文本</h3>
+<p><code>module-499.js</code> 的转录处理代码维护 <code>uuid → parentUuid</code> 关系，区分 transcript、accumulate、last-wins 等记录类别，还处理 compact boundary、file-history snapshot/delta、attribution、工具记录等。<a href="evidence/source-anchors.html#s07">S07</a></p>
+<p>父子 UUID 关系允许把会话看作结构化记录链；这是从代码结构推导的解释。本文不据此宣称已完整恢复所有分支、fork 和重写规则。</p>
+<h3 id="112-jsonl-storagev5">11.2 JSONL 与 storageV5 同时存在</h3>
+<p>本发布件包含以 <code>&lt;sessionId&gt;.jsonl</code> 定位转录、追加 JSON 行、修复缺少结尾换行、处理部分写入和同步 mirror 的实现。另一方面，多个函数通过 <code>storageV5</code> 的 backend、namespace/key、<code>readRecords</code>、<code>append</code>、<code>replaceRecords</code>、<code>stat</code> 等接口操作数据。</p>
+<p>例如 <code>xRr()</code> 按反向顺序和字节窗口读取记录，并在跨页时检查锚记录是否改变；<code>YBe()</code> 使用文件描述符追加到已有文件，并显式处理 short write；<code>DPt()</code> 写入 JSON 行后通知 mirror。<a href="evidence/source-anchors.html#s08">S08</a>、<a href="evidence/source-anchors.html#s09">S09</a></p>
+<p><strong>架构判断</strong>：这里存在存储抽象与兼容/过渡路径，不能简化成“所有状态都直接写到一个 JSON 文件”。也不能因为看到 <code>storageV5</code> 就断言本机启用了某个远程或数据库后端。当前实际存储后端、迁移完成度和用户文件状态未检查。</p>
+<h3 id="113">11.3 历史、转录与成本的区别</h3>
+<p><code>module-378.js</code> 中的 history 写入器通过 <code>backend.append(historyKey, records)</code> 或文件路径保存输入历史，具有 pending entries、flush 和错误分类。<code>module-1620.js</code> 包含 history purge 的扫描与替换逻辑，并拒绝某些符号链接/非普通文件情形。这和完整 transcript 是不同职责。<a href="evidence/source-anchors.html#s10">S10</a></p>
+<p><code>cost-state</code> schema 单独记录费用、API/工具耗时、增删行数、输入/输出/thinking tokens、cache read/create tokens、web search 次数以及按模型用量。这些是客户端状态合同，不等于最终账单结算真值。<a href="evidence/source-anchors.html#s11">S11</a></p>
+<p>CLI 的 continue/resume/fork-session、stop/attach、purge 等契约也印证：会话身份、转录、运行进程和工作树需要分别管理。</p>
+<h2 id="12-subagent">12. Subagent、后台任务与协作</h2>
+<h3 id="121">12.1 主引擎复用</h3>
+<p>交互入口 <code>module-1892.js</code> 的 options 设置 <code>isNonInteractiveSession: false, runQuery: yN</code>；非交互入口 <code>module-1920.js</code> 设置 <code>isNonInteractiveSession: true, runQuery: yN</code>。子 Agent 的 <code>qR()</code> 复用父 <code>options.runQuery</code>，并重新构造自己的 messages、system/user context、工具和权限。</p>
+<p>因此，在这两个已检查的入口中，主 Agent 和子 Agent 共用同一查询引擎接口与实现绑定；“开一个子 Agent”主要是构建新的上下文和生命周期，不是另写一套推理循环。<a href="evidence/agent-loop.html">S8</a>、<a href="evidence/source-anchors.html#s14">S14</a></p>
+<h3 id="122-agent-tool">12.2 Agent tool 与任务注册</h3>
+<p><code>module-692.js</code> 的 Agent 工具解析 agent type、model、effort、cwd、isolation 和 run_in_background；检查递归深度、允许类型和权限。异步分支注册任务，前台分支则等待或允许后续切换后台。</p>
+<p><code>Dle()</code> 注册的 <code>local_agent</code> 状态包含 owner/parent agent、spawn depth、selected agent、abort controller、pending messages、keepalive 与 background 标志。<code>UDs()</code> 的前台任务还有 background signal、父取消中继和可选自动后台定时器。<a href="evidence/agent-loop.html">S1–S5</a></p>
+<p>可以将其分成四个状态域：</p>
+<table>
+<thead>
+<tr>
+<th>状态域</th>
+<th>负责的问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Query state machine</td>
+<td>当前模型轮次、工具结果、继续或停止</td>
+</tr>
+<tr>
+<td>Tool executor</td>
+<td>哪些调用可并行、取消、结果交付</td>
+</tr>
+<tr>
+<td>Task registry</td>
+<td>子任务归属、运行状态、前台/后台生命周期</td>
+</tr>
+<tr>
+<td>Team/mailbox runner</td>
+<td>持续等待消息、协作者空闲和关闭</td>
+</tr>
+</tbody>
+</table>
+<h3 id="123">12.3 长生命周期协作者与后台进程</h3>
+<p><code>module-1776.js</code> 中还有同进程 teammate runner：消费新消息、调用子 Agent 引擎、必要时压缩自己的历史、等待 mailbox 或 shutdown，并处理空闲退出。它是发行件中的一条能力路径，未证明当前账户已开启团队能力。<a href="evidence/agent-loop.html">S6/S7</a></p>
+<p>另外，CLI <code>--background</code>、attach/logs/stop/rm/respawn 表示进程级后台会话控制。<code>module-621.js</code> 中可见后台 spawn 环境整理、PATH 处理、配置目录校验和隔离相关变量。<strong>子 Agent 异步任务、同进程 teammate、独立后台会话是不同概念</strong>，文档不把它们统称为“每个 agent 都是一个新进程”。<a href="evidence/source-anchors.html#s12">S12</a></p>
+<h2 id="13-mcp">13. MCP：外部工具客户端与内部工具服务器</h2>
+<h3 id="131">13.1 作为客户端</h3>
+<p><code>module-2110.js</code> 实现多种 transport 路由、握手/协议协商、tools/list 刷新与重试、listChanged 处理、活动调用 watchdog、错误状态与 elicitation 生命周期。stdio transport 使用 <code>shell: false</code>，管理 stdout 增量消息和子进程回收。<a href="evidence/tools-extensions.html">TE-11–13</a></p>
+<p>调用链可以抽象为：</p>
+<pre><code class="language-text">server configuration
+ → transport / handshake
+ → capabilities + tools/list
+ → 包装成统一 Tool
+ → Agent 工具集合
+ → 统一调度与权限
+ → MCP call
+</code></pre>
+<p>上游 input schema 被转换到本地工具合同；annotations 中 readOnlyHint 可参与只读及并发判断。这个 hint 是服务器提供的声明，不是证明外部工具没有副作用。权限处理仍会 ask 或交中央策略，不是 MCP 连接成功后就默认任意执行。<a href="evidence/tools-extensions.html">TE-14</a></p>
+<p>transport 和协议分支受配置、feature flag、denylist 等约束；公开 <code>mcp add</code> 支持的选项与内部所有 transport 类型也不完全一致，不能据内部 switch 列表给出用户通用命令。</p>
+<h3 id="132">13.2 作为服务器</h3>
+<p>CLI 还公开 <code>mcp serve</code>。<code>module-2484.js</code> 注册 tools/list 与 tools/call handler，动态计算工具集合，输入经过 schema、validateInput 和 <code>checkPlainCall</code> 后再调用内部工具；结果被转换为 MCP 返回格式，取消与错误另行处理。<a href="evidence/tools-extensions.html">TE-15/16</a></p>
+<p>这里可以对外暴露工具执行能力，不能未经验证就将其描述成“通过 MCP 启动完整 Claude 对话模型”。本次未启动该服务，也未列出运行时实际可服务工具清单。</p>
+<h2 id="14-pluginskillhookslsp-ide">14. Plugin、Skill、Hooks、LSP 与 IDE</h2>
+<h3 id="141-plugin">14.1 Plugin 是扩展组件容器</h3>
+<p>manifest 读取先尝试 <code>.claude-plugin/plugin.json</code>，再尝试 <code>plugin.json</code>。代码识别 commands、agents、skills、output styles、themes、workflows、monitors，以及 MCP、LSP 和 Hooks 配置。<a href="evidence/tools-extensions.html">TE-18</a></p>
+<p><code>module-1201.js</code> 的 <code>P$()</code> 刷新过程会清缓存、重读配置、并发加载 commands/skills/agent definitions、加载 MCP/LSP、应用刷新状态并注册 Hooks；错误和警告单独收集。这是一套可部分失败的扩展加载系统，并非简单拼接一段 prompt。<a href="evidence/tools-extensions.html">TE-17</a></p>
+<p>CLI 另外提供插件安装/更新/校验、marketplace、详情和评估接口。当前机器的具体已装插件及其来源未读取。</p>
+<h3 id="142-skill">14.2 Skill 是上下文和执行选项的可调用描述</h3>
+<p>实际插件 Skill 加载链 <code>TXo → Hje</code> 枚举技能路径，使用 realpath 去重，也避免重复加载已经由用户目录 loader 提供的同一路径。<code>Mq()</code> 解析 frontmatter 中的 allowed-tools、model、effort、fork context、agent、background、可调用标志等，将技能构造成 prompt 对象；<code>getPromptForCommand()</code> 在调用时展开正文、参数和变量。<a href="evidence/tools-extensions.html">TE-27–29</a></p>
+<p>这支持按“可发现的描述元数据”和“调用时的正文”分层上下文。token 估算模块也区分 always-on 与 on-invoke，但它只作为辅助证据，不能取代实际 loader 的代码证据。完整用户/项目 Skill 的覆盖优先级仍未穷尽。<a href="evidence/tools-extensions.html">TE-25</a></p>
+<h3 id="143-hooks">14.3 Hooks 是生命周期中间件</h3>
+<p>注册函数 <code>Q9()</code> 有 workspace trust 门禁，并用 registration/swap epoch 避免较旧的异步注册覆盖新状态。事件涵盖工具、权限、子 Agent、任务和工作树生命周期。</p>
+<p>Hook 结果会被规范化；PreToolUse block 可转为 deny。超时是否阻断取决于事件和 <code>timeoutFailsClosed</code> 等条件，不应笼统宣称所有 Hook 失败都放行或都拒绝。<a href="evidence/tools-extensions.html">TE-19/20</a></p>
+<h3 id="144-lsp-ide">14.4 LSP 与 IDE 连接</h3>
+<p>LSP 工具把用户 1-based 行列转换为协议 0-based 坐标，映射到 definition、references、hover、document/workspace symbols、implementation 与 call hierarchy 请求。LSP 配置可来自 <code>.lsp.json</code> 和 manifest，并有 schema 与相对路径检查。<a href="evidence/tools-extensions.html">TE-21–23</a></p>
+<p>IDE 的连接则有 SSE/WS MCP 路径与 <code>ide_connected</code> 通知。LSP 提供代码语义查询，IDE 提供编辑器环境集成，两者有关联但不是同一个组件。<a href="evidence/tools-extensions.html">TE-24</a></p>
+<h2 id="15">15. 配置、认证与可观测性</h2>
+<h3 id="151">15.1 配置是带来源与策略的系统</h3>
+<p>代码区分 user、project、local、flag、policy 等来源。<code>module-078.js</code> 包含配置 schema、managed policy 合并约束和仅允许高信任来源设置的字段；<code>module-110.js</code> 可见 managed-settings 文件/目录读取、错误记录和不同 layer 的解析缓存。<a href="evidence/source-anchors.html#s13">S13</a></p>
+<p>这意味着不能把配置实现理解为一次普通对象 merge。例如代码对项目设置放宽上级 sandbox 限制有专门限制。完整优先级和所有字段合并语义未恢复，所以本文只列来源与职责，不编造一个普适的覆盖顺序。</p>
+<h3 id="152">15.2 认证与凭证存储</h3>
+<p><code>module-143.js</code> 定义可读写/删除的 secure-storage 合同，包含 macOS Keychain 访问、缓存、并发读、错误与 generation 处理，也有 plaintext backend 及条件 fallback。具体失败种类会影响是否允许降级，不能将其简写成“Keychain 失败总会写明文”。<a href="evidence/source-anchors.html#s15">S15</a></p>
+<p>provider factory 再负责把适用的认证解析器、headers 和 endpoint 接入模型客户端。用户实际采用 OAuth、API key、云供应商凭证还是 gateway，本次没有查看，也没有执行认证状态查询。</p>
+<h3 id="153">15.3 遥测与成本</h3>
+<p><code>module-043.js</code> 中可见 nonessential-traffic、DISABLE_TELEMETRY、DO_NOT_TRACK 的判断；<code>module-1654.js</code> 中有 OpenTelemetry metrics/logs/traces 与 OTLP export 分支。<code>module-640.js</code> 的 <code>Zfe()</code> 在某些路径等待 remote managed settings 后初始化遥测，并有只初始化一次及错误处理。<a href="evidence/source-anchors.html#s16">S16–18</a></p>
+<p><strong>注意区别</strong>：第三方/企业 OTLP 开关、产品自身事件、诊断日志与成本账本是不同通道。某个开关或 exporter 的存在不能证明当前向某个地址发送数据，更不能仅凭一个条件函数就断言它控制所有网络活动。本次没有抓取运行流量。</p>
+<h2 id="16">16. 两条关键业务链路</h2>
+<h3 id="161">16.1 “读取代码并修改文件”的本地请求</h3>
+<p>这是依据静态职责重建的流程，不是本次实际执行记录：</p>
+<pre><code class="language-text">输入 prompt
+ → 交互界面或 headless 收到输入
+ → 会话/设置/可用工具/上下文准备
+ → yN → ku/Cu
+ → model facts + 必要压缩 + 请求构建
+ → 模型响应流出现 tool_use
+ → Ls 排队
+ → schema / validateInput / Hooks / 权限
+ → 工具实际读取或修改
+ → tool_result + 上下文更新
+ → 再次调用模型或 stop
+ → 界面/SDK 输出，并由持久化层记录状态
+</code></pre>
+<p>如果是 shell 工具，还可能经过启用的命令沙箱；如果是 MCP 工具，则通过 transport 调外部服务器。文件工具和 shell 工具的执行边界不能混为一谈。</p>
+<h3 id="162-agent">16.2 “把工作交给后台子 Agent”</h3>
+<pre><code class="language-text">主 Agent 的 tool_use(Agent)
+ → Agent 工具校验类型/深度/权限/isolation
+ → 建立 agentContext 与 task registry 项
+ → 构造子 messages/tools/permissions
+ → qR → 父 options.runQuery
+ → 独立消费查询事件
+ → 完成、取消、后台等待或交付结果
+ → 主会话按任务结果继续
+</code></pre>
+<p>在已检查的交互/headless 主入口里，runQuery 都绑定 yN。工作树隔离、独立进程和后台任务是不同维度，并非每个后台子 Agent 都自动创建工作树或新进程。</p>
+<h2 id="17">17. 架构评估与可借鉴之处</h2>
+<p>以下是基于重建结果的工程判断，而非 Anthropic 官方设计意图：</p>
+<table>
+<thead>
+<tr>
+<th>设计</th>
+<th>带来的价值</th>
+<th>需要承担的复杂度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>异步生成器 + 显式查询状态</td>
+<td>UI/SDK 消费事件，恢复分支可建模</td>
+<td>事件顺序、取消和跨轮状态一致性</td>
+</tr>
+<tr>
+<td>工具合同 + 独立并发调度</td>
+<td>本地/MCP 工具共享入口，区分互斥与并发</td>
+<td>并发安全提示质量及队列阻塞</td>
+</tr>
+<tr>
+<td>工具权限 + OS 沙箱分层</td>
+<td>决策与执行约束各自负责</td>
+<td>不同执行后端的边界覆盖需要明确</td>
+</tr>
+<tr>
+<td>prompt snapshot + compact boundary</td>
+<td>提示稳定、历史可恢复、上下文有预算</td>
+<td>摘要失真、状态重建和快照失效</td>
+</tr>
+<tr>
+<td>task registry 与 query 分离</td>
+<td>前台/后台/子任务共享查询核心</td>
+<td>归属、取消、结果交付和闲置管理</td>
+</tr>
+<tr>
+<td>插件组合 MCP/LSP/Skill/Hooks</td>
+<td>扩展形态丰富，可统一刷新</td>
+<td>信任、配置错误、部分加载失败</td>
+</tr>
+<tr>
+<td>版本化单文件分发</td>
+<td>降低外部 JS runtime 安装依赖</td>
+<td>包体较大、运行进程与磁盘版本可能不一致</td>
+</tr>
+</tbody>
+</table>
+<p>对于自建前端 Agent，最直接可迁移的是三点：把查询核心设计成事件生产者；把工具定义与执行/权限/调度分开；把 transcript、输入历史、任务与成本状态作为不同对象管理。没有必要在早期复制所有云、团队或 marketplace 能力。</p>
+<h2 id="18">18. 完成度、限制与证据导航</h2>
+<h3 id="181">18.1 本次问题覆盖</h3>
+<table>
+<thead>
+<tr>
+<th>调查项</th>
+<th>结论状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本机命令、版本、哈希、格式、签名、依赖</td>
+<td>已核实</td>
+</tr>
+<tr>
+<td>单文件运行时与 JS 载荷</td>
+<td>已观察，Bun/JSC 架构高置信重建</td>
+</tr>
+<tr>
+<td>交互 TUI / headless 入口</td>
+<td>代码与 CLI 契约已对应</td>
+</tr>
+<tr>
+<td>Agent 循环、工具反馈、有限恢复</td>
+<td>核心静态路径已追踪</td>
+</tr>
+<tr>
+<td>模型适配、model facts</td>
+<td>工厂与主要接口已追踪，全部 transport 未穷尽</td>
+</tr>
+<tr>
+<td>工具调度、Hook、权限、沙箱后端</td>
+<td>局部执行链已追踪，完整安全证明不在范围内</td>
+</tr>
+<tr>
+<td>压缩与提示快照</td>
+<td>主要实现已追踪，运行质量未测</td>
+</tr>
+<tr>
+<td>transcript / storageV5 / 成本状态</td>
+<td>数据合同与部分读写路径已观察，实际后端未检查</td>
+</tr>
+<tr>
+<td>子 Agent / task / background</td>
+<td>关键路径已追踪，全部专门运行模式未穷尽</td>
+</tr>
+<tr>
+<td>MCP / plugins / Skills / LSP / IDE</td>
+<td>主要实现存在已证明，本机启用状态未检查</td>
+</tr>
+<tr>
+<td>模型服务端、真实网络流量、动态行为</td>
+<td>未分析</td>
+</tr>
+</tbody>
+</table>
+<h3 id="182">18.2 必须保留的限制</h3>
+<ul>
+<li>没有 Ghidra/Hopper/IDA 原生反编译证据；未还原 Bun/JSC 的原生内部调用图。</li>
+<li>没有完整 Bun 虚拟文件系统与 source map 重建。分析模块编号不能映射为真实仓库目录。</li>
+<li>语法可解析不意味着每个模块逐行人工审阅；9 文件 REA 图为局部分析，其他模块采用定点追踪。</li>
+<li>存在功能开关、用户/企业策略与环境分支。静态存在、CLI 宣告和运行时启用是三个不同结论。</li>
+<li>未验证真实模型调用、压缩质量、外部工具副作用、权限所有组合、网络发送或账户开关。</li>
+<li>这是本机 2.1.310、确切哈希的架构快照。后续更新需重新确认文件身份。</li>
+</ul>
+<h3 id="183">18.3 证据文件</h3>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="evidence/source-anchors.html">source-anchors.md</a></td>
+<td>精选代码片段、合成编号、原二进制精确字节范围</td>
+</tr>
+<tr>
+<td><a href="evidence/extraction-manifest.json">extraction-manifest.json</a></td>
+<td>每个提取候选的来源范围与 SHA-256</td>
+</tr>
+<tr>
+<td><a href="evidence/macho.json">macho.json</a></td>
+<td>REA Mach-O 元数据，Evidence <code>ev_a2fab99385a995d8dade2e6b0905b08e9c7003bbae988d2b6b4d5b0d774f06bc</code></td>
+</tr>
+<tr>
+<td><a href="evidence/rea-evidence.json">rea-evidence.json</a></td>
+<td>REA 完整局部分析，父 Evidence <code>ev_e0b3e8a03ac1fead74315372008e676f57e494931412f0ff3b1c42bc5e11b0d0</code></td>
+</tr>
+<tr>
+<td><a href="evidence/native.txt">native.txt</a></td>
+<td>file / codesign / otool 原始输出</td>
+</tr>
+<tr>
+<td><a href="evidence/cli-help.txt">cli-help.txt</a></td>
+<td>当前根命令契约</td>
+</tr>
+<tr>
+<td><a href="evidence/cli-subcommands.txt">cli-subcommands.txt</a></td>
+<td>子命令能力与模式契约</td>
+</tr>
+<tr>
+<td><a href="evidence/cli-extra-help.txt">cli-extra-help.txt</a></td>
+<td>MCP、插件等细化契约</td>
+</tr>
+<tr>
+<td><a href="evidence/agent-loop.html">agent-loop.md</a></td>
+<td>核心循环与子任务定点取证笔记</td>
+</tr>
+<tr>
+<td><a href="evidence/tools-extensions.html">tools-extensions.md</a></td>
+<td>工具与扩展的 29 条定点证据</td>
+</tr>
+<tr>
+<td><a href="evidence/binary-cli.html">binary-cli.md</a></td>
+<td>分发、签名与 CLI 的独立核对</td>
+</tr>
+<tr>
+<td><a href="evidence/extract-and-verify.py">extract-and-verify.py</a></td>
+<td>以相同二进制重新提取并验证来源的脚本</td>
+</tr>
+</tbody>
+</table>
+<p><code>Sxx</code>、<code>TE-xx</code>、A/M/C 等是本次调查索引，不是 REA 自动生成的 Evidence ID。补充笔记中的 AST offset 为 JavaScript UTF-16 code unit；工具取证笔记的字符 offset 为 Python Unicode code point。复核优先使用已换算的<strong>原二进制字节半开区间</strong>，不要混用两种字符坐标。</p></article></div><footer>本地发布件快照。静态路径不等于当前已启用行为；证据与覆盖边界见正文。</footer></body></html>

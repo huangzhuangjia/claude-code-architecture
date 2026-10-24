@@ -1,0 +1,422 @@
+[
+  {
+    "id": "S01",
+    "label": "启动工作目录",
+    "module": "module-001.js",
+    "module_sha256": "0539a26e3e6b7a6c4b69d9783ff7fe0be363c3705319842fbc93333d83392738",
+    "module_byte_range": [
+      649,
+      1244
+    ],
+    "binary_byte_range": [
+      215491137,
+      215491732
+    ],
+    "needle": "function bis"
+  },
+  {
+    "id": "S02",
+    "label": "启动协调与遥测/Hook分支",
+    "module": "module-848.js",
+    "module_sha256": "af82ae1c75b1c8e6abcb6006e15e9f42498ee2b3ae1af0dca0ab79aa7d84d2e0",
+    "module_byte_range": [
+      26000,
+      27520
+    ],
+    "binary_byte_range": [
+      235857265,
+      235858785
+    ],
+    "needle": "if(Px(),D2()"
+  },
+  {
+    "id": "S03",
+    "label": "React 元素和 Hooks",
+    "module": "module-489.js",
+    "module_sha256": "79c60bf4f7b6827e488c00d6e41d6de5144cb144548cf3da8cf1aa119388222a",
+    "module_byte_range": [
+      4451,
+      5471
+    ],
+    "binary_byte_range": [
+      225139917,
+      225140937
+    ],
+    "needle": "react.transitional.element"
+  },
+  {
+    "id": "S04",
+    "label": "终端 Yoga 布局与恢复",
+    "module": "module-579.js",
+    "module_sha256": "077d7c5764866bcd37d4e8f6144197f9cbfc564dc79db83a1b447c622f4c3617",
+    "module_byte_range": [
+      335882,
+      337802
+    ],
+    "binary_byte_range": [
+      232177291,
+      232179211
+    ],
+    "needle": "calculateYogaLayout(n){"
+  },
+  {
+    "id": "S05",
+    "label": "Headless 模块导出",
+    "module": "module-1920.js",
+    "module_sha256": "9fd27b57a5b5cb4a0e26483b965ccdb12effb03308860801c833f6e2ea1fc8b3",
+    "module_byte_range": [
+      804812,
+      805086
+    ],
+    "binary_byte_range": [
+      254499266,
+      254499540
+    ],
+    "needle": "as runHeadless"
+  },
+  {
+    "id": "S06",
+    "label": "Prompt snapshot 附件",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      120385,
+      122105
+    ],
+    "binary_byte_range": [
+      225277268,
+      225278988
+    ],
+    "needle": "var Hao=new Set"
+  },
+  {
+    "id": "S07",
+    "label": "转录记录分类与父消息关系",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      287305,
+      290025
+    ],
+    "binary_byte_range": [
+      225444188,
+      225446908
+    ],
+    "needle": "async function pBe"
+  },
+  {
+    "id": "S08",
+    "label": "storageV5 反向分页",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      291573,
+      292993
+    ],
+    "binary_byte_range": [
+      225448456,
+      225449876
+    ],
+    "needle": "async function*xRr"
+  },
+  {
+    "id": "S09",
+    "label": "JSONL 写入、short write 和 mirror",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      447757,
+      449777
+    ],
+    "binary_byte_range": [
+      225604640,
+      225606660
+    ],
+    "needle": "function DPt"
+  },
+  {
+    "id": "S10",
+    "label": "输入历史 flush",
+    "module": "module-378.js",
+    "module_sha256": "f35ee0ebaf37751f7379cb2dddd3dfb6930cb1e92d9daa1179e816a0f62bc4a4",
+    "module_byte_range": [
+      46670,
+      48190
+    ],
+    "binary_byte_range": [
+      223689078,
+      223690598
+    ],
+    "needle": "this.inFlightFlushEntries=new Set"
+  },
+  {
+    "id": "S11",
+    "label": "cost-state schema",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      282631,
+      284151
+    ],
+    "binary_byte_range": [
+      225439514,
+      225441034
+    ],
+    "needle": "Wnn=f(()=>"
+  },
+  {
+    "id": "S12",
+    "label": "后台进程配置目录防护",
+    "module": "module-621.js",
+    "module_sha256": "43d832672dac11680625a6a422bafb437d7f998eec203800f833bf8d88e4cac8",
+    "module_byte_range": [
+      13985,
+      15505
+    ],
+    "binary_byte_range": [
+      232497637,
+      232499157
+    ],
+    "needle": "if(process.env.CLAUDE_CONFIG_DIR)"
+  },
+  {
+    "id": "S13",
+    "label": "配置来源",
+    "module": "module-078.js",
+    "module_sha256": "65859c6671d80357f68a86601d1518449f91908d6a56f74189a57136cf88fa57",
+    "module_byte_range": [
+      26507,
+      27127
+    ],
+    "binary_byte_range": [
+      216377341,
+      216377961
+    ],
+    "needle": "var UKt="
+  },
+  {
+    "id": "S14",
+    "label": "Headless 主引擎绑定",
+    "module": "module-1920.js",
+    "module_sha256": "9fd27b57a5b5cb4a0e26483b965ccdb12effb03308860801c833f6e2ea1fc8b3",
+    "module_byte_range": [
+      398703,
+      399523
+    ],
+    "binary_byte_range": [
+      254093157,
+      254093977
+    ],
+    "needle": "isNonInteractiveSession:!0,runQuery:yN"
+  },
+  {
+    "id": "S15",
+    "label": "macOS Keychain 读取、缓存",
+    "module": "module-143.js",
+    "module_sha256": "1e56aa35f197a44c8509e22cc367c50d036b2e35b311c18b680c2ca3f3152f92",
+    "module_byte_range": [
+      4367,
+      6187
+    ],
+    "binary_byte_range": [
+      218484863,
+      218486683
+    ],
+    "needle": "security find-generic-password"
+  },
+  {
+    "id": "S16",
+    "label": "遥测/流量策略条件",
+    "module": "module-043.js",
+    "module_sha256": "edbc5aec71746b9a23ac8c1242da099d9019a73fb05aa9c61fea602734c23c00",
+    "module_byte_range": [
+      14273,
+      15293
+    ],
+    "binary_byte_range": [
+      215887387,
+      215888407
+    ],
+    "needle": "function w3t"
+  },
+  {
+    "id": "S17",
+    "label": "第三方遥测开关与初始化",
+    "module": "module-1654.js",
+    "module_sha256": "6b208a4553199f262a4fc29430026ca3019bde45bd4fac20ea146807939c850c",
+    "module_byte_range": [
+      43319,
+      45039
+    ],
+    "binary_byte_range": [
+      246799648,
+      246801368
+    ],
+    "needle": "function Bt()"
+  },
+  {
+    "id": "S18",
+    "label": "遥测初始化协调",
+    "module": "module-640.js",
+    "module_sha256": "af0b65d5de35c22882bfb89b1e469a335a575683a93bc24f16190792a3c9399e",
+    "module_byte_range": [
+      11208,
+      12994
+    ],
+    "binary_byte_range": [
+      232805123,
+      232806909
+    ],
+    "needle": "function Zfe"
+  },
+  {
+    "id": "S19",
+    "label": "查询入口",
+    "module": "module-745.js",
+    "module_sha256": "1df554fe95d536fc6eee26a8d952da67f349b0f3a27b8147723574f4c048dc07",
+    "module_byte_range": [
+      139643,
+      140863
+    ],
+    "binary_byte_range": [
+      234389739,
+      234390959
+    ],
+    "needle": "async function*yN"
+  },
+  {
+    "id": "S20",
+    "label": "查询默认依赖",
+    "module": "module-745.js",
+    "module_sha256": "1df554fe95d536fc6eee26a8d952da67f349b0f3a27b8147723574f4c048dc07",
+    "module_byte_range": [
+      126106,
+      126526
+    ],
+    "binary_byte_range": [
+      234376202,
+      234376622
+    ],
+    "needle": "function Dd()"
+  },
+  {
+    "id": "S21",
+    "label": "流式工具调度器",
+    "module": "module-745.js",
+    "module_sha256": "1df554fe95d536fc6eee26a8d952da67f349b0f3a27b8147723574f4c048dc07",
+    "module_byte_range": [
+      53552,
+      55472
+    ],
+    "binary_byte_range": [
+      234303648,
+      234305568
+    ],
+    "needle": "class Ls"
+  },
+  {
+    "id": "S22",
+    "label": "Provider factory",
+    "module": "module-231.js",
+    "module_sha256": "0b5caade893c20b57aba8156df78bc691cd7ef270aa3491a26b1defa2ea5ef77",
+    "module_byte_range": [
+      262379,
+      264299
+    ],
+    "binary_byte_range": [
+      220628362,
+      220630282
+    ],
+    "needle": "async function bF"
+  },
+  {
+    "id": "S23",
+    "label": "摘要压缩",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      2544289,
+      2545809
+    ],
+    "binary_byte_range": [
+      227701172,
+      227702692
+    ],
+    "needle": "async function yMr"
+  },
+  {
+    "id": "S24",
+    "label": "自动压缩调度",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      2575361,
+      2576881
+    ],
+    "binary_byte_range": [
+      227732244,
+      227733764
+    ],
+    "needle": "function*SMr"
+  },
+  {
+    "id": "S25",
+    "label": "权限中 Hook allow/deny 处理",
+    "module": "module-499.js",
+    "module_sha256": "642b9ffa0f9b78662cb558971957027f9dbf75d2cb7d9b8425252e44ed09d769",
+    "module_byte_range": [
+      4052635,
+      4055755
+    ],
+    "binary_byte_range": [
+      229209518,
+      229212638
+    ],
+    "needle": "async function T8r"
+  },
+  {
+    "id": "S26",
+    "label": "插件刷新",
+    "module": "module-1201.js",
+    "module_sha256": "971881f504ef88788c3569b6536b2db3e10a240683d500b7df81b23a5def6c4e",
+    "module_byte_range": [
+      1765,
+      4485
+    ],
+    "binary_byte_range": [
+      239947388,
+      239950108
+    ],
+    "needle": "async function P$"
+  },
+  {
+    "id": "S27",
+    "label": "MCP 服务端调用内置工具",
+    "module": "module-2484.js",
+    "module_sha256": "1f8362148a16fa4e7e19e9f796bd996867ac96200688473e8c94055e975eb614",
+    "module_byte_range": [
+      12185,
+      13405
+    ],
+    "binary_byte_range": [
+      264153675,
+      264154895
+    ],
+    "needle": "T.call(n.data"
+  },
+  {
+    "id": "S28",
+    "label": "交互主引擎绑定",
+    "module": "module-1892.js",
+    "module_sha256": "253fa07d8cd8ac4de1e65510125b6d74c6bbf19c44165f53e04614ab16778571",
+    "module_byte_range": [
+      1496022,
+      1496842
+    ],
+    "binary_byte_range": [
+      252784858,
+      252785678
+    ],
+    "needle": "isNonInteractiveSession:!1,runQuery:yN"
+  }
+]
